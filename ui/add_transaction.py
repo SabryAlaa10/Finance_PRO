@@ -1,12 +1,29 @@
 import streamlit as st
 import datetime
 import pandas as pd
-import time
 from logic.data_loader import save_transaction, load_data
 
 def get_user_id():
     """Get current user_id from session"""
     return st.session_state.get('user_id', 1)
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_month_stats(df_hash):
+    """Calculate monthly stats with caching"""
+    df = df_hash['df']
+    if df.empty:
+        return None
+    
+    today = datetime.date.today()
+    this_month = df[df["Date"].dt.month == today.month]
+    
+    return {
+        'month_income': this_month[this_month["Type"] == "Income"]["Amount"].sum(),
+        'month_expenses': this_month[this_month["Type"] == "Expense"]["Amount"].sum(),
+        'total_transactions': len(this_month),
+        'net_balance': this_month[this_month["Type"] == "Income"]["Amount"].sum() - 
+                       this_month[this_month["Type"] == "Expense"]["Amount"].sum()
+    }
 
 def render_add_transaction():
     """
@@ -205,49 +222,49 @@ def render_add_transaction():
     try:
         df = load_data()
         if not df.empty:
-            today = datetime.date.today()
-            this_month = df[df["Date"].dt.month == today.month]
+            # Create hashable version for caching
+            df_hash = {'df': df, 'hash': hash(pd.util.hash_pandas_object(df).sum())}
+            stats = get_month_stats(df_hash)
             
-            col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-            
-            with col_s1:
-                month_income = this_month[this_month["Type"] == "Income"]["Amount"].sum()
-                st.markdown(f"""
-                <div class="stats-mini-card">
-                    <div style="font-size: 24px; margin-bottom: 5px;">📈</div>
-                    <div class="stats-label">This Month Income</div>
-                    <div class="stats-value">{month_income:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col_s2:
-                month_expenses = this_month[this_month["Type"] == "Expense"]["Amount"].sum()
-                st.markdown(f"""
-                <div class="stats-mini-card">
-                    <div style="font-size: 24px; margin-bottom: 5px;">💸</div>
-                    <div class="stats-label">This Month Expenses</div>
-                    <div class="stats-value">{month_expenses:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col_s3:
-                total_transactions = len(this_month)
-                st.markdown(f"""
-                <div class="stats-mini-card">
-                    <div style="font-size: 24px; margin-bottom: 5px;">📊</div>
-                    <div class="stats-label">Total Transactions</div>
-                    <div class="stats-value">{total_transactions}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col_s4:
-                net_balance = month_income - month_expenses
-                balance_color = "#22c55e" if net_balance >= 0 else "#f87171"
-                st.markdown(f"""
-                <div class="stats-mini-card">
-                    <div style="font-size: 24px; margin-bottom: 5px;">💰</div>
-                    <div class="stats-label">Net Balance</div>
-                    <div class="stats-value" style="background: linear-gradient(120deg, {balance_color}, {balance_color}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{net_balance:,.0f}</div>
+            if stats:
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                
+                with col_s1:
+                    st.markdown(f"""
+                    <div class="stats-mini-card">
+                        <div style="font-size: 24px; margin-bottom: 5px;">📈</div>
+                        <div class="stats-label">This Month Income</div>
+                        <div class="stats-value">{stats['month_income']:,.0f}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_s2:
+                    st.markdown(f"""
+                    <div class="stats-mini-card">
+                        <div style="font-size: 24px; margin-bottom: 5px;">💸</div>
+                        <div class="stats-label">This Month Expenses</div>
+                        <div class="stats-value">{stats['month_expenses']:,.0f}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_s3:
+                    st.markdown(f"""
+                    <div class="stats-mini-card">
+                        <div style="font-size: 24px; margin-bottom: 5px;">📊</div>
+                        <div class="stats-label">Total Transactions</div>
+                        <div class="stats-value">{stats['total_transactions']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_s4:
+                    balance_color = "#22c55e" if stats['net_balance'] >= 0 else "#f87171"
+                    st.markdown(f"""
+                    <div class="stats-mini-card">
+                        <div style="font-size: 24px; margin-bottom: 5px;">💰</div>
+                        <div class="stats-label">Net Balance</div>
+                        <div class="stats-value" style="background: linear-gradient(120deg, {balance_color}, {balance_color}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{stats['net_balance']:,.0f}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -373,21 +390,22 @@ def render_add_transaction():
         
         if submitted:
             if amount > 0:
-                success = save_transaction(
-                    date, 
-                    txn_type_clean, 
-                    category_clean, 
-                    source_clean, 
-                    amount, 
-                    description,
-                    user_id=get_user_id()
-                )
+                # Show loading spinner during save
+                with st.spinner("Saving transaction..."):
+                    success = save_transaction(
+                        date, 
+                        txn_type_clean, 
+                        category_clean, 
+                        source_clean, 
+                        amount, 
+                        description,
+                        user_id=get_user_id()
+                    )
+                
                 if success:
+                    st.success("✅ Transaction saved successfully!")
                     st.balloons()
-                    st.success("✅ Transaction saved successfully! Refreshing data...")
-                    # Small delay to show success message before rerun
-                    time.sleep(1)
-                    # Auto-refresh to update all data across the app
+                    # Immediate rerun without delay
                     st.rerun()
                 else:
                     st.error("❌ Failed to save transaction. Please try again.")
