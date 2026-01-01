@@ -301,12 +301,15 @@ def main():
     # Load Data for current user
     df = load_data(user_id)
     
-    # Show database status in sidebar
+    # Show database status in sidebar with data source info
     from logic.database import database_available
     if database_available():
-        st.sidebar.success("🔒 Database: Connected (Secure)")
+        st.sidebar.success("🔒 Database: Connected (Neon)")
+        st.sidebar.caption(f"📊 Transactions: {len(df)} records")
     else:
         st.sidebar.warning("📁 Database: CSV Mode (Local)")
+        st.sidebar.caption(f"⚠️ Using local CSV file")
+        st.sidebar.caption(f"📊 Transactions: {len(df)} records")
     
     # Header & Logout
     c1, c2 = st.sidebar.columns([3, 1])
