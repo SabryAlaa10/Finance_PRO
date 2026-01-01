@@ -391,8 +391,9 @@ def render_add_transaction():
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-                    st.session_state["refresh"] = True
                     st.balloons()
+                    # Auto-refresh to update all data across the app
+                    st.rerun()
                 else:
                     st.error("❌ Failed to save transaction. Please try again.")
             else:
