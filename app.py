@@ -4,7 +4,7 @@ import pandas as pd
 
 # Import Logic
 from logic.data_loader import load_data, init_db
-from logic.database import verify_user, database_available
+from logic.database import verify_user, database_available, init_database
 from ui.styles import APP_STYLE
 
 # Import UI Modules
@@ -25,6 +25,12 @@ st.set_page_config(
 
 # Apply Styles
 st.markdown(APP_STYLE, unsafe_allow_html=True)
+
+# Initialize database on app start
+if database_available() and 'db_initialized' not in st.session_state:
+    with st.spinner("Initializing database..."):
+        init_database()
+    st.session_state['db_initialized'] = True
 
 # Main App Logic
 def login_page():
@@ -278,7 +284,7 @@ def main():
         login_page()
         return
     
-    # Initialize database
+    # Initialize database and CSV
     init_db()
     
     # Get user_id from session
@@ -288,6 +294,7 @@ def main():
     df = load_data(user_id)
     
     # Show database status in sidebar
+    from logic.database import database_available
     if database_available():
         st.sidebar.success("🔒 Database: Connected (Secure)")
     else:

@@ -72,7 +72,9 @@ def init_database():
                 ON transactions(user_id, date)
             """))
             
-            # Insert default user if not exists
+            conn.commit()
+            
+            # Insert default user if not exists (separate transaction)
             result = conn.execute(text("SELECT id FROM users WHERE username = :username"),
                                 {"username": "saleh"})
             if result.fetchone() is None:
@@ -80,8 +82,8 @@ def init_database():
                     INSERT INTO users (username, password) 
                     VALUES (:username, :password)
                 """), {"username": "saleh", "password": "saleh109"})
-            
-            conn.commit()
+                conn.commit()
+        
         return True
     except Exception as e:
         print(f"Database initialization error: {e}")
@@ -97,7 +99,7 @@ def load_transactions_from_db(user_id=1):
         query = """
             SELECT date, type, category, source, amount, description
             FROM transactions
-            WHERE user_id = :user_id
+            WHERE user_id = %(user_id)s
             ORDER BY date DESC
         """
         df = pd.read_sql(query, engine, params={"user_id": user_id})
