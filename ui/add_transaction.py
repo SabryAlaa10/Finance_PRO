@@ -1,6 +1,7 @@
 import streamlit as st
 import datetime
 import pandas as pd
+import time
 from logic.data_loader import save_transaction, load_data
 
 def get_user_id():
@@ -382,16 +383,10 @@ def render_add_transaction():
                     user_id=get_user_id()
                 )
                 if success:
-                    st.markdown("""
-                    <div class="success-animation">
-                        <div style="text-align: center; padding: 20px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; margin-top: 20px;">
-                            <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
-                            <div style="font-size: 18px; font-weight: 700; color: #22c55e;">Transaction Saved Successfully!</div>
-                            <div style="font-size: 13px; color: #94a3b8; margin-top: 5px;">Your transaction has been recorded</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
                     st.balloons()
+                    st.success("✅ Transaction saved successfully! Refreshing data...")
+                    # Small delay to show success message before rerun
+                    time.sleep(1)
                     # Auto-refresh to update all data across the app
                     st.rerun()
                 else:

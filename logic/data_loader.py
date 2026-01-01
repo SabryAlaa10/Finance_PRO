@@ -2,6 +2,7 @@ import pandas as pd
 from pathlib import Path
 import os
 from datetime import datetime
+import streamlit as st
 from logic.database import (
     database_available, 
     load_transactions_from_db, 
@@ -35,10 +36,9 @@ def init_db():
     if database_available():
         init_database()
 
-def load_data(user_id=1) -> pd.DataFrame:
-    """Load transactions from database (preferred) or CSV file (fallback)."""
-    init_db()
-    
+@st.cache_data(ttl=10, show_spinner=False)
+def load_data_cached(user_id=1, cache_key=None):
+    """Load transactions with caching for better performance."""
     # Try loading from database first
     if database_available():
         df = load_transactions_from_db(user_id)
@@ -56,6 +56,14 @@ def load_data(user_id=1) -> pd.DataFrame:
         print(f"Error loading data: {e}")
         return pd.DataFrame(columns=COLUMNS)
 
+def load_data(user_id=1) -> pd.DataFrame:
+    """Load transactions from database (preferred) or CSV file (fallback)."""
+    init_db()
+    
+    # Use cache key from session state to bust cache when needed
+    cache_key = st.session_state.get('data_refresh_key', 0)
+    return load_data_cached(user_id, cache_key)
+
 def save_transaction(date, type_, category, source, amount, description="", user_id=1):
     """Save transaction to database (preferred) or CSV (fallback)."""
     init_db()
@@ -64,6 +72,9 @@ def save_transaction(date, type_, category, source, amount, description="", user
     if database_available():
         success = save_transaction_to_db(user_id, date, type_, category, source, amount, description)
         if success:
+            # Increment cache key to refresh data
+            current_key = st.session_state.get('data_refresh_key', 0)
+            st.session_state['data_refresh_key'] = current_key + 1
             return True
     
     # Fallback to CSV
@@ -80,5 +91,9 @@ def save_transaction(date, type_, category, source, amount, description="", user
     # Append to CSV
     header = not DATA_FILE.exists()
     new_df.to_csv(DATA_FILE, mode='a', header=header, index=False)
+    
+    # Increment cache key to refresh data
+    current_key = st.session_state.get('data_refresh_key', 0)
+    st.session_state['data_refresh_key'] = current_key + 1
     
     return True

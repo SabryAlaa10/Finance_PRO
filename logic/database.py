@@ -27,10 +27,21 @@ def get_database_url():
     return None
 
 def get_engine():
-    """Create SQLAlchemy engine"""
+    """Create SQLAlchemy engine with connection pooling"""
     db_url = get_database_url()
     if db_url:
-        return create_engine(db_url)
+        # Use connection pooling for better performance
+        return create_engine(
+            db_url,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,  # Check connection health before using
+            pool_recycle=3600,   # Recycle connections after 1 hour
+            connect_args={
+                'connect_timeout': 5,  # Shorter timeout
+                'options': '-c statement_timeout=10000'  # 10 second query timeout
+            }
+        )
     return None
 
 def init_database():
@@ -117,13 +128,14 @@ def load_transactions_from_db(user_id=1):
         return None
 
 def save_transaction_to_db(user_id, date, type_, category, source, amount, description=""):
-    """Save transaction to PostgreSQL"""
+    """Save transaction to PostgreSQL with optimized connection handling"""
     engine = get_engine()
     if not engine:
         return False
     
     try:
-        with engine.connect() as conn:
+        # Use connection context manager for automatic cleanup
+        with engine.begin() as conn:  # begin() handles commit automatically
             conn.execute(text("""
                 INSERT INTO transactions (user_id, date, type, category, source, amount, description)
                 VALUES (:user_id, :date, :type, :category, :source, :amount, :description)
@@ -136,7 +148,6 @@ def save_transaction_to_db(user_id, date, type_, category, source, amount, descr
                 "amount": float(amount),
                 "description": description
             })
-            conn.commit()
         return True
     except Exception as e:
         print(f"Error saving to database: {e}")
