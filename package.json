@@ -1,0 +1,27 @@
+{
+  "name": "finance-pro-dashboard",
+  "version": "1.0.0",
+  "description": "Comprehensive personal finance management application built with Streamlit",
+  "main": "app.py",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SabryAlaa10/Finance_PRO.git"
+  },
+  "keywords": [
+    "finance",
+    "dashboard",
+    "streamlit",
+    "personal-finance",
+    "expense-tracker",
+    "income-tracker",
+    "investment-portfolio",
+    "pdf-reports",
+    "financial-analytics"
+  ],
+  "author": "Sabry Alaa",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SabryAlaa10/Finance_PRO/issues"
+  },
+  "homepage": "https://github.com/SabryAlaa10/Finance_PRO#readme"
+}
