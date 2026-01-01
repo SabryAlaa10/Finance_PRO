@@ -45,5 +45,5 @@ Thumbs.db
 # Test files
 test_*.py
 check_app.py
-*.md
-!README.md
+DYNAMIC_CATEGORIES_UPDATE.md
+REPORT_ENHANCEMENTS.md
