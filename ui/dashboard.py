@@ -10,6 +10,15 @@ def render_dashboard(df):
     """
     Render the main dashboard view.
     """
+    # DEBUG: Show data info at top
+    st.write("🐛 DEBUG INFO:")
+    st.write(f"Data shape: {df.shape if not df.empty else 'EMPTY'}")
+    if not df.empty:
+        st.write(f"Columns: {df.columns.tolist()}")
+        st.write("First 3 rows:")
+        st.dataframe(df.head(3))
+        st.write("---")
+    
     # Hero Section
     st.markdown(
         """

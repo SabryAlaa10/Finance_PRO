@@ -36,10 +36,12 @@ def init_db():
     if database_available():
         init_database()
 
-@st.cache_data(ttl=60, show_spinner=False)  # Cache for 1 minute only for faster updates
+# Cache DISABLED for debugging
+# @st.cache_data(ttl=60, show_spinner=False)  # Cache for 1 minute only for faster updates
 def load_data_cached(user_id=1, cache_key=None):
     """Load transactions with caching - ONLY from database."""
     print(f"🔄 Loading data for user_id={user_id}, cache_key={cache_key}")
+    print("⚠️ CACHE DISABLED - Loading directly from database")
     
     # ONLY database - no CSV fallback
     if not database_available():
@@ -50,6 +52,10 @@ def load_data_cached(user_id=1, cache_key=None):
         df = load_transactions_from_db(user_id)
         if df is not None:
             print(f"✅ Loaded {len(df)} transactions from Neon database")
+            print(f"📋 Columns: {df.columns.tolist()}")
+            print(f"📊 Shape: {df.shape}")
+            if not df.empty:
+                print(f"🔢 First row: {df.iloc[0].to_dict()}")
             return df
         else:
             print(f"⚠️ Database query returned None")
