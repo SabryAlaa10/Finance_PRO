@@ -36,35 +36,28 @@ def init_db():
     if database_available():
         init_database()
 
-@st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes instead of 10 seconds
+@st.cache_data(ttl=60, show_spinner=False)  # Cache for 1 minute only for faster updates
 def load_data_cached(user_id=1, cache_key=None):
-    """Load transactions with caching for better performance."""
+    """Load transactions with caching - ONLY from database."""
     print(f"🔄 Loading data for user_id={user_id}, cache_key={cache_key}")
     
-    # Try loading from database first
-    if database_available():
-        try:
-            df = load_transactions_from_db(user_id)
-            if df is not None and not df.empty:
-                print(f"✅ Loaded {len(df)} transactions from database")
-                return df
-            else:
-                print(f"⚠️ Database returned empty, trying CSV")
-        except Exception as e:
-            print(f"❌ Database load error: {e}, trying CSV")
-    else:
-        print("⚠️ Database not available, using CSV")
+    # ONLY database - no CSV fallback
+    if not database_available():
+        print("❌ Database not configured!")
+        return pd.DataFrame(columns=COLUMNS)
     
-    # Fallback to CSV
     try:
-        df = pd.read_csv(DATA_FILE)
-        # Ensure Date is datetime
-        if not df.empty:
-            df["Date"] = pd.to_datetime(df["Date"])
-        print(f"💾 Loaded {len(df)} transactions from CSV")
-        return df
+        df = load_transactions_from_db(user_id)
+        if df is not None:
+            print(f"✅ Loaded {len(df)} transactions from Neon database")
+            return df
+        else:
+            print(f"⚠️ Database query returned None")
+            return pd.DataFrame(columns=COLUMNS)
     except Exception as e:
-        print(f"Error loading data: {e}")
+        print(f"❌ Database load error: {e}")
+        import traceback
+        traceback.print_exc()
         return pd.DataFrame(columns=COLUMNS)
 
 def load_data(user_id=1) -> pd.DataFrame:
@@ -76,48 +69,32 @@ def load_data(user_id=1) -> pd.DataFrame:
     return load_data_cached(user_id, cache_key)
 
 def save_transaction(date, type_, category, source, amount, description="", user_id=1):
-    """Save transaction to database (preferred) or CSV (fallback)."""
+    """Save transaction - ONLY to database (Neon)."""
     init_db()
     
-    # Try saving to database first
-    if database_available():
-        try:
-            success = save_transaction_to_db(user_id, date, type_, category, source, amount, description)
-            if success:
-                print(f"✅ Transaction saved to database (user_id={user_id})")
-                # Increment cache key to refresh data
-                current_key = st.session_state.get('data_refresh_key', 0)
-                st.session_state['data_refresh_key'] = current_key + 1
-                # Clear the cache to force reload
-                load_data_cached.clear()
-                return True
-            else:
-                print(f"⚠️ Database save failed, falling back to CSV")
-        except Exception as e:
-            print(f"❌ Database error: {e}, falling back to CSV")
-    else:
-        print("⚠️ Database not available, using CSV")
+    # Database ONLY - no CSV fallback
+    if not database_available():
+        print("❌ Database not configured! Cannot save transaction.")
+        return False
     
-    # Fallback to CSV
-    new_data = {
-        "Date": [date],
-        "Type": [type_],
-        "Category": [category],
-        "Source": [source],
-        "Amount": [float(amount)],
-        "Description": [description]
-    }
-    new_df = pd.DataFrame(new_data)
-    
-    # Append to CSV
-    header = not DATA_FILE.exists()
-    new_df.to_csv(DATA_FILE, mode='a', header=header, index=False)
-    print(f"💾 Transaction saved to CSV")
-    
-    # Increment cache key to refresh data
-    current_key = st.session_state.get('data_refresh_key', 0)
-    st.session_state['data_refresh_key'] = current_key + 1
-    # Clear the cache to force reload
-    load_data_cached.clear()
-    
-    return True
+    try:
+        print(f"💾 Saving transaction to Neon database (user_id={user_id})")
+        success = save_transaction_to_db(user_id, date, type_, category, source, amount, description)
+        
+        if success:
+            print(f"✅ Transaction saved successfully to Neon database")
+            # Increment cache key to refresh data
+            current_key = st.session_state.get('data_refresh_key', 0)
+            st.session_state['data_refresh_key'] = current_key + 1
+            # Clear the cache to force reload
+            load_data_cached.clear()
+            return True
+        else:
+            print(f"❌ Failed to save transaction to database")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Database save error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False

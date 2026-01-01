@@ -305,25 +305,27 @@ def main():
     from logic.database import database_available, get_database_url
     db_url = get_database_url()
     
-    if database_available():
-        st.sidebar.success("🔒 Database: Connected (Neon)")
-        if db_url:
-            # Show last 10 chars of connection string
-            masked_url = "..." + db_url[-20:] if len(db_url) > 20 else db_url
-            st.sidebar.caption(f"🔗 {masked_url}")
-        st.sidebar.caption(f"👤 User ID: {user_id}")
-        st.sidebar.caption(f"📊 Transactions: {len(df)} records")
-        
-        # Add debug button
-        if st.sidebar.button("🔄 Force Reload from DB"):
-            from logic.data_loader import load_data_cached
-            load_data_cached.clear()
-            st.session_state['data_refresh_key'] = st.session_state.get('data_refresh_key', 0) + 1
-            st.rerun()
-    else:
-        st.sidebar.warning("📁 Database: CSV Mode (Local)")
-        st.sidebar.caption(f"⚠️ Using local CSV file")
-        st.sidebar.caption(f"📊 Transactions: {len(df)} records")
+    if not database_available():
+        st.sidebar.error("❌ Database: NOT CONNECTED")
+        st.sidebar.warning("⚠️ Configure Neon database in Secrets")
+        st.sidebar.stop()
+    
+    st.sidebar.success("✅ Database: Neon (Connected)")
+    if db_url:
+        # Show last 20 chars of connection string
+        masked_url = "..." + db_url[-25:] if len(db_url) > 25 else db_url
+        st.sidebar.caption(f"🔗 {masked_url}")
+    st.sidebar.caption(f"👤 User ID: {user_id}")
+    st.sidebar.caption(f"📊 Transactions: **{len(df)}** records")
+    
+    st.sidebar.divider()
+    
+    # Add debug button
+    if st.sidebar.button("🔄 Force Reload Data", use_container_width=True):
+        from logic.data_loader import load_data_cached
+        load_data_cached.clear()
+        st.session_state['data_refresh_key'] = st.session_state.get('data_refresh_key', 0) + 1
+        st.rerun()
     
     # Header & Logout
     c1, c2 = st.sidebar.columns([3, 1])
