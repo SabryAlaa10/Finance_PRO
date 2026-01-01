@@ -5,8 +5,6 @@ Generates professional PDF reports for weekly and monthly financial summaries.
 import pandas as pd
 from datetime import datetime, timedelta
 from io import BytesIO
-import plotly.graph_objects as go
-import plotly.express as px
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -15,6 +13,10 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for server environments
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def get_period_data(df: pd.DataFrame, period_type: str = "weekly"):
@@ -88,7 +90,7 @@ def calculate_summary_stats(df: pd.DataFrame):
 
 def create_chart_image(df: pd.DataFrame, chart_type: str = "summary"):
     """
-    Create plotly chart and return as image bytes.
+    Create chart using matplotlib and return as image bytes.
     
     Args:
         df: Transaction dataframe
@@ -97,201 +99,165 @@ def create_chart_image(df: pd.DataFrame, chart_type: str = "summary"):
     Returns:
         Image bytes
     """
-    if df.empty:
-        # Create empty placeholder
-        fig = go.Figure()
-        fig.add_annotation(
-            text="No data available",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="#94a3b8")
-        )
-    elif chart_type == "summary":
-        # Enhanced Income vs Expenses bar chart with better visibility
-        income = df[df["Type"] == "Income"]["Amount"].sum()
-        expenses = df[df["Type"] == "Expense"]["Amount"].sum()
-        investments = df[df["Type"] == "Investment"]["Amount"].sum()
+    try:
+        buf = BytesIO()
         
-        fig = go.Figure()
+        # Create matplotlib figure
+        fig, ax = plt.subplots(figsize=(10, 5), dpi=150)
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
         
-        fig.add_trace(go.Bar(
-            x=["Income", "Expenses", "Investments"],
-            y=[income, expenses, investments],
-            marker=dict(
-                color=["#22c55e", "#ef4444", "#a855f7"],
-                line=dict(color="#1e293b", width=2)
-            ),
-            text=[f"<b>{income:,.0f} EGP</b>", f"<b>{expenses:,.0f} EGP</b>", f"<b>{investments:,.0f} EGP</b>"],
-            textposition="outside",
-            textfont=dict(size=14, color="#1e293b", family="Arial Black"),
-            hovertemplate="<b>%{x}</b><br>Amount: %{y:,.0f} EGP<extra></extra>"
-        ))
+        if df.empty:
+            # Create empty placeholder
+            ax.text(0.5, 0.5, 'No data available', 
+                   ha='center', va='center', fontsize=16, color='#94a3b8',
+                   transform=ax.transAxes)
+            ax.axis('off')
         
-        fig.update_layout(
-            title=dict(
-                text="<b>Financial Summary</b>",
-                font=dict(size=18, color="#1e293b", family="Arial")
-            ),
-            showlegend=False,
-            height=450,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            font=dict(color="#1e293b", size=12),
-            yaxis=dict(
-                title="<b>Amount (EGP)</b>",
-                gridcolor="#e5e7eb",
-                showgrid=True
-            ),
-            xaxis=dict(
-                title="",
-                tickfont=dict(size=13, color="#1e293b")
-            ),
-            margin=dict(t=60, b=40, l=60, r=40)
-        )
-    
-    elif chart_type == "income_sources":
-        # Income breakdown by category
-        income_df = df[df["Type"] == "Income"]
-        if not income_df.empty:
-            income_summary = income_df.groupby("Category")["Amount"].sum().sort_values(ascending=True).reset_index()
+        elif chart_type == "summary":
+            # Financial Summary bar chart
+            income = df[df["Type"] == "Income"]["Amount"].sum()
+            expenses = df[df["Type"] == "Expense"]["Amount"].sum()
+            investments = df[df["Type"] == "Investment"]["Amount"].sum()
             
-            fig = go.Figure()
+            categories = ['Income', 'Expenses', 'Investments']
+            values = [income, expenses, investments]
+            colors_list = ['#22c55e', '#ef4444', '#a855f7']
             
-            fig.add_trace(go.Bar(
-                x=income_summary["Amount"],
-                y=income_summary["Category"],
-                orientation='h',
-                marker=dict(
-                    color=income_summary["Amount"],
-                    colorscale=[[0, "#10b981"], [0.5, "#22c55e"], [1, "#84cc16"]],
-                    line=dict(color="#059669", width=2)
-                ),
-                text=income_summary["Amount"].apply(lambda x: f"<b>{x:,.0f} EGP</b>"),
-                textposition="outside",
-                textfont=dict(size=13, color="#1e293b", family="Arial Black"),
-                hovertemplate="<b>%{y}</b><br>Amount: %{x:,.0f} EGP<extra></extra>"
-            ))
+            bars = ax.bar(categories, values, color=colors_list, edgecolor='#1e293b', linewidth=2.5, width=0.6)
+            ax.set_ylabel('Amount (EGP)', fontsize=13, fontweight='bold', color='#1e293b')
+            ax.set_title('Financial Summary', fontsize=17, fontweight='bold', pad=20, color='#1e293b')
+            ax.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.8)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_color('#cbd5e1')
+            ax.spines['bottom'].set_color('#cbd5e1')
             
-            fig.update_layout(
-                title=dict(
-                    text="<b>Income by Source</b>",
-                    font=dict(size=18, color="#1e293b")
-                ),
-                height=400,
-                plot_bgcolor="white",
-                paper_bgcolor="white",
-                font=dict(color="#1e293b", size=12),
-                xaxis=dict(
-                    title="<b>Amount (EGP)</b>",
-                    gridcolor="#e5e7eb",
-                    showgrid=True
-                ),
-                yaxis=dict(title=""),
-                showlegend=False,
-                margin=dict(t=60, b=40, l=120, r=80)
-            )
-        else:
-            fig = go.Figure()
-            fig.add_annotation(text="No income data", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-    
-    elif chart_type == "category_breakdown":
-        # Enhanced Expenses by category with better labels
-        expenses_df = df[df["Type"] == "Expense"]
-        if not expenses_df.empty:
-            cat_summary = expenses_df.groupby("Category")["Amount"].sum().sort_values(ascending=True).reset_index()
-            
-            fig = go.Figure()
-            
-            fig.add_trace(go.Bar(
-                x=cat_summary["Amount"],
-                y=cat_summary["Category"],
-                orientation='h',
-                marker=dict(
-                    color=cat_summary["Amount"],
-                    colorscale=[[0, "#fca5a5"], [0.5, "#f87171"], [1, "#dc2626"]],
-                    line=dict(color="#b91c1c", width=2)
-                ),
-                text=cat_summary["Amount"].apply(lambda x: f"<b>{x:,.0f} EGP</b>"),
-                textposition="outside",
-                textfont=dict(size=13, color="#1e293b", family="Arial Black"),
-                hovertemplate="<b>%{y}</b><br>Amount: %{x:,.0f} EGP<extra></extra>"
-            ))
-            
-            fig.update_layout(
-                title=dict(
-                    text="<b>Expense Breakdown by Category</b>",
-                    font=dict(size=18, color="#1e293b")
-                ),
-                height=400,
-                plot_bgcolor="white",
-                paper_bgcolor="white",
-                font=dict(color="#1e293b", size=12),
-                xaxis=dict(
-                    title="<b>Amount (EGP)</b>",
-                    gridcolor="#e5e7eb",
-                    showgrid=True
-                ),
-                yaxis=dict(title=""),
-                showlegend=False,
-                margin=dict(t=60, b=40, l=120, r=80)
-            )
-        else:
-            fig = go.Figure()
-            fig.add_annotation(text="No expense data", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-    
-    elif chart_type == "daily_trend":
-        # Enhanced daily transaction trend with clearer labels
-        if not df.empty:
-            daily = df.groupby([df["Date"].dt.date, "Type"])["Amount"].sum().reset_index()
-            
-            fig = go.Figure()
-            
-            for txn_type, color in [("Income", "#22c55e"), ("Expense", "#ef4444"), ("Investment", "#a855f7")]:
-                type_data = daily[daily["Type"] == txn_type]
-                if not type_data.empty:
-                    fig.add_trace(go.Bar(
-                        x=type_data["Date"],
-                        y=type_data["Amount"],
-                        name=txn_type,
-                        marker=dict(color=color, line=dict(color="#1e293b", width=1)),
-                        text=type_data["Amount"].apply(lambda x: f"{x:,.0f}"),
-                        textposition="outside",
-                        textfont=dict(size=11, color="#1e293b"),
-                        hovertemplate=f"<b>{txn_type}</b><br>%{{x}}<br>Amount: %{{y:,.0f}} EGP<extra></extra>"
-                    ))
-            
-            fig.update_layout(
-                title=dict(
-                    text="<b>Daily Transaction Trend</b>",
-                    font=dict(size=18, color="#1e293b")
-                ),
-                height=400,
-                plot_bgcolor="white",
-                paper_bgcolor="white",
-                font=dict(color="#1e293b", size=12),
-                barmode="group",
-                yaxis=dict(
-                    title="<b>Amount (EGP)</b>",
-                    gridcolor="#e5e7eb",
-                    showgrid=True
-                ),
-                xaxis=dict(title="<b>Date</b>"),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1
-                ),
-                margin=dict(t=80, b=40, l=60, r=40)
-            )
-        else:
-            fig = go.Figure()
-            fig.add_annotation(text="No transaction data", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-    
-    # Convert to image bytes with high resolution
-    img_bytes = fig.to_image(format="png", width=800, height=450, scale=2)
-    return img_bytes
+            # Add value labels on bars
+            for bar, val in zip(bars, values):
+                height = bar.get_height()
+                if height > 0:
+                    ax.text(bar.get_x() + bar.get_width()/2., height,
+                           f'{val:,.0f} EGP', ha='center', va='bottom', 
+                           fontweight='bold', fontsize=11, color='#1e293b')
+        
+        elif chart_type == "income_sources":
+            # Income breakdown by category
+            income_df = df[df["Type"] == "Income"]
+            if not income_df.empty:
+                income_summary = income_df.groupby("Category")["Amount"].sum().sort_values().reset_index()
+                
+                bars = ax.barh(income_summary["Category"], income_summary["Amount"], 
+                       color='#22c55e', edgecolor='#059669', linewidth=2)
+                ax.set_xlabel('Amount (EGP)', fontsize=13, fontweight='bold', color='#1e293b')
+                ax.set_title('Income by Source', fontsize=17, fontweight='bold', pad=20, color='#1e293b')
+                ax.grid(axis='x', alpha=0.3, linestyle='--', linewidth=0.8)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['left'].set_color('#cbd5e1')
+                ax.spines['bottom'].set_color('#cbd5e1')
+                
+                # Add value labels
+                for i, val in enumerate(income_summary["Amount"]):
+                    ax.text(val, i, f' {val:,.0f} EGP', va='center', 
+                           fontweight='bold', fontsize=10, color='#1e293b')
+            else:
+                ax.text(0.5, 0.5, 'No income data', 
+                       ha='center', va='center', fontsize=16, color='#94a3b8',
+                       transform=ax.transAxes)
+                ax.axis('off')
+        
+        elif chart_type == "category_breakdown":
+            # Expenses by category
+            expenses_df = df[df["Type"] == "Expense"]
+            if not expenses_df.empty:
+                cat_summary = expenses_df.groupby("Category")["Amount"].sum().sort_values().reset_index()
+                
+                bars = ax.barh(cat_summary["Category"], cat_summary["Amount"],
+                       color='#ef4444', edgecolor='#b91c1c', linewidth=2)
+                ax.set_xlabel('Amount (EGP)', fontsize=13, fontweight='bold', color='#1e293b')
+                ax.set_title('Expense Breakdown', fontsize=17, fontweight='bold', pad=20, color='#1e293b')
+                ax.grid(axis='x', alpha=0.3, linestyle='--', linewidth=0.8)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['left'].set_color('#cbd5e1')
+                ax.spines['bottom'].set_color('#cbd5e1')
+                
+                # Add value labels
+                for i, val in enumerate(cat_summary["Amount"]):
+                    ax.text(val, i, f' {val:,.0f} EGP', va='center', 
+                           fontweight='bold', fontsize=10, color='#1e293b')
+            else:
+                ax.text(0.5, 0.5, 'No expense data', 
+                       ha='center', va='center', fontsize=16, color='#94a3b8',
+                       transform=ax.transAxes)
+                ax.axis('off')
+        
+        elif chart_type == "daily_trend":
+            # Daily transaction trend
+            if not df.empty:
+                daily = df.groupby([df["Date"].dt.date, "Type"])["Amount"].sum().reset_index()
+                
+                # Plot each transaction type
+                has_data = False
+                for txn_type, color, marker in [("Income", "#22c55e", "o"), 
+                                                 ("Expense", "#ef4444", "s"), 
+                                                 ("Investment", "#a855f7", "^")]:
+                    type_data = daily[daily["Type"] == txn_type]
+                    if not type_data.empty:
+                        ax.plot(type_data["Date"], type_data["Amount"], 
+                               marker=marker, linewidth=2.5, markersize=8,
+                               color=color, label=txn_type, markeredgecolor='white',
+                               markeredgewidth=1.5)
+                        has_data = True
+                
+                if has_data:
+                    ax.set_xlabel('Date', fontsize=13, fontweight='bold', color='#1e293b')
+                    ax.set_ylabel('Amount (EGP)', fontsize=13, fontweight='bold', color='#1e293b')
+                    ax.set_title('Daily Transaction Trend', fontsize=17, fontweight='bold', 
+                                pad=20, color='#1e293b')
+                    ax.legend(loc='upper left', framealpha=0.95, edgecolor='#cbd5e1')
+                    ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
+                    ax.spines['top'].set_visible(False)
+                    ax.spines['right'].set_visible(False)
+                    ax.spines['left'].set_color('#cbd5e1')
+                    ax.spines['bottom'].set_color('#cbd5e1')
+                    plt.xticks(rotation=45, ha='right')
+                else:
+                    ax.text(0.5, 0.5, 'No transaction data', 
+                           ha='center', va='center', fontsize=16, color='#94a3b8',
+                           transform=ax.transAxes)
+                    ax.axis('off')
+            else:
+                ax.text(0.5, 0.5, 'No transaction data', 
+                       ha='center', va='center', fontsize=16, color='#94a3b8',
+                       transform=ax.transAxes)
+                ax.axis('off')
+        
+        plt.tight_layout()
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
+        plt.close(fig)
+        
+        buf.seek(0)
+        return buf.getvalue()
+        
+    except Exception as e:
+        print(f"Chart generation error: {e}")
+        # Return error placeholder image
+        try:
+            fig_empty, ax_empty = plt.subplots(figsize=(10, 5), dpi=100)
+            ax_empty.text(0.5, 0.5, f'Chart generation failed\n{str(e)}', 
+                         ha='center', va='center', fontsize=12, color='#ef4444',
+                         transform=ax_empty.transAxes)
+            ax_empty.axis('off')
+            buf_empty = BytesIO()
+            plt.savefig(buf_empty, format='png', dpi=100, bbox_inches='tight', facecolor='white')
+            plt.close(fig_empty)
+            buf_empty.seek(0)
+            return buf_empty.getvalue()
+        except:
+            # Last resort: return minimal image
+            return b''
 
 
 def generate_pdf_report(df: pd.DataFrame, period_type: str = "weekly"):
