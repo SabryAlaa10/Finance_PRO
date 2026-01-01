@@ -107,9 +107,12 @@ def load_transactions_from_db(user_id=1):
     """Load transactions from PostgreSQL with optimized query"""
     engine = get_engine()
     if not engine:
+        print("❌ No database engine available")
         return None
     
     try:
+        print(f"🔍 Querying database for user_id={user_id}")
+        
         # Optimized query: select only needed columns, add index hint
         query = """
             SELECT date, type, category, source, amount, description
@@ -120,7 +123,12 @@ def load_transactions_from_db(user_id=1):
         # Use read_sql_query instead of read_sql for better performance
         df = pd.read_sql_query(query, engine, params={"user_id": user_id})
         
+        print(f"📊 Database returned {len(df)} rows")
+        
         if not df.empty:
+            print(f"📋 Columns from DB: {df.columns.tolist()}")
+            print(f"🔢 First row: {df.iloc[0].to_dict() if len(df) > 0 else 'N/A'}")
+            
             # Convert columns in bulk
             df = df.rename(columns={
                 'date': 'Date',
@@ -132,10 +140,17 @@ def load_transactions_from_db(user_id=1):
             })
             # Convert date column efficiently
             df['Date'] = pd.to_datetime(df['Date'])
-        
-        return df
+            
+            print(f"✅ Successfully loaded and formatted {len(df)} transactions")
+            return df
+        else:
+            print("⚠️ Query returned empty DataFrame")
+            return df
+            
     except Exception as e:
-        print(f"Error loading from database: {e}")
+        print(f"❌ Error loading from database: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def save_transaction_to_db(user_id, date, type_, category, source, amount, description=""):
@@ -184,4 +199,10 @@ def verify_user(username, password):
 
 def database_available():
     """Check if database is available"""
-    return get_database_url() is not None
+    db_url = get_database_url()
+    available = db_url is not None
+    if available:
+        print(f"✅ Database URL configured: {db_url[:30]}...")
+    else:
+        print("❌ No database URL found")
+    return available
