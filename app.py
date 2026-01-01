@@ -243,27 +243,35 @@ def login_page():
         st.markdown('<div class="login-button">', unsafe_allow_html=True)
         # Login logic
         if st.button("🚀 Login", type="primary", use_container_width=True):
+            login_success = False
+            
             # Try database authentication first
             if database_available():
-                user_id = verify_user(username, password)
-                if user_id:
-                    st.session_state['logged_in'] = True
-                    st.session_state['username'] = username
-                    st.session_state['user_id'] = user_id
-                    st.balloons()
-                    st.rerun()
-                else:
-                    st.error("❌ Invalid username or password")
-            else:
-                # Fallback to hardcoded credentials
+                try:
+                    user_id = verify_user(username, password)
+                    if user_id:
+                        st.session_state['logged_in'] = True
+                        st.session_state['username'] = username
+                        st.session_state['user_id'] = user_id
+                        login_success = True
+                except Exception as e:
+                    print(f"Database login error: {e}")
+                    # Fall through to hardcoded credentials
+            
+            # Fallback to hardcoded credentials if database fails or not available
+            if not login_success:
                 if username == "saleh" and password == "saleh109":
                     st.session_state['logged_in'] = True
                     st.session_state['username'] = username
                     st.session_state['user_id'] = 1
-                    st.balloons()
-                    st.rerun()
-                else:
-                    st.error("❌ Invalid username or password")
+                    login_success = True
+            
+            # Show result
+            if login_success:
+                st.balloons()
+                st.rerun()
+            else:
+                st.error("❌ Invalid username or password")
         st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown("""
