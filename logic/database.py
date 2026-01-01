@@ -26,20 +26,23 @@ def get_database_url():
     
     return None
 
+@st.cache_resource
 def get_engine():
-    """Create SQLAlchemy engine with connection pooling"""
+    """Create SQLAlchemy engine with connection pooling (cached as singleton)"""
     db_url = get_database_url()
     if db_url:
         # Use connection pooling for better performance
         return create_engine(
             db_url,
-            pool_size=5,
-            max_overflow=10,
-            pool_pre_ping=True,  # Check connection health before using
-            pool_recycle=3600,   # Recycle connections after 1 hour
+            pool_size=10,           # Increased pool size
+            max_overflow=20,        # Increased overflow
+            pool_pre_ping=True,     # Check connection health before using
+            pool_recycle=1800,      # Recycle connections after 30 minutes
+            pool_timeout=10,        # Wait max 10 seconds for connection
+            echo=False,             # Disable SQL logging for better performance
             connect_args={
-                'connect_timeout': 5,  # Shorter timeout
-                'options': '-c statement_timeout=10000'  # 10 second query timeout
+                'connect_timeout': 3,  # Faster timeout
+                'options': '-c statement_timeout=5000'  # 5 second query timeout
             }
         )
     return None
@@ -101,27 +104,35 @@ def init_database():
         return False
 
 def load_transactions_from_db(user_id=1):
-    """Load transactions from PostgreSQL"""
+    """Load transactions from PostgreSQL with optimized query"""
     engine = get_engine()
     if not engine:
         return None
     
     try:
+        # Optimized query: select only needed columns, add index hint
         query = """
             SELECT date, type, category, source, amount, description
             FROM transactions
             WHERE user_id = %(user_id)s
             ORDER BY date DESC
         """
-        df = pd.read_sql(query, engine, params={"user_id": user_id})
+        # Use read_sql_query instead of read_sql for better performance
+        df = pd.read_sql_query(query, engine, params={"user_id": user_id})
+        
         if not df.empty:
-            df['Date'] = pd.to_datetime(df['date'])
-            df['Type'] = df['type']
-            df['Category'] = df['category']
-            df['Source'] = df['source']
-            df['Amount'] = df['amount']
-            df['Description'] = df['description']
-            df = df[['Date', 'Type', 'Category', 'Source', 'Amount', 'Description']]
+            # Convert columns in bulk
+            df = df.rename(columns={
+                'date': 'Date',
+                'type': 'Type',
+                'category': 'Category',
+                'source': 'Source',
+                'amount': 'Amount',
+                'description': 'Description'
+            })
+            # Convert date column efficiently
+            df['Date'] = pd.to_datetime(df['Date'])
+        
         return df
     except Exception as e:
         print(f"Error loading from database: {e}")

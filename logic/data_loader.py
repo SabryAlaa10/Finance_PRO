@@ -36,7 +36,7 @@ def init_db():
     if database_available():
         init_database()
 
-@st.cache_data(ttl=10, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes instead of 10 seconds
 def load_data_cached(user_id=1, cache_key=None):
     """Load transactions with caching for better performance."""
     # Try loading from database first
