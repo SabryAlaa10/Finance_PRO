@@ -3,6 +3,10 @@ import datetime
 import pandas as pd
 from logic.data_loader import save_transaction, load_data
 
+def get_user_id():
+    """Get current user_id from session"""
+    return st.session_state.get('user_id', 1)
+
 def render_add_transaction():
     """
     Render the professional 'Add Transaction' form with animations and visual enhancements.
@@ -374,7 +378,8 @@ def render_add_transaction():
                     category_clean, 
                     source_clean, 
                     amount, 
-                    description
+                    description,
+                    user_id=get_user_id()
                 )
                 if success:
                     st.markdown("""

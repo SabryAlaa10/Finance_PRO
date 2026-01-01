@@ -4,6 +4,7 @@ import pandas as pd
 
 # Import Logic
 from logic.data_loader import load_data, init_db
+from logic.database import verify_user, database_available
 from ui.styles import APP_STYLE
 
 # Import UI Modules
@@ -234,13 +235,29 @@ def login_page():
         st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown('<div class="login-button">', unsafe_allow_html=True)
-        if st.button("🔐 Sign In", type="primary", use_container_width=True):
-            if username == "saleh" and password == "saleh109":
-                st.session_state["authenticated"] = True
-                st.balloons()
-                st.rerun()
+        # Login logic
+        if st.button("🚀 Login", type="primary", use_container_width=True):
+            # Try database authentication first
+            if database_available():
+                user_id = verify_user(username, password)
+                if user_id:
+                    st.session_state['logged_in'] = True
+                    st.session_state['username'] = username
+                    st.session_state['user_id'] = user_id
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid username or password")
             else:
-                st.error("❌ Invalid credentials. Please try again.")
+                # Fallback to hardcoded credentials
+                if username == "saleh" and password == "saleh109":
+                    st.session_state['logged_in'] = True
+                    st.session_state['username'] = username
+                    st.session_state['user_id'] = 1
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid username or password")
         st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown("""
@@ -256,19 +273,25 @@ def login_page():
         st.markdown('</div>', unsafe_allow_html=True)
 
 def main():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
-        
-    if not st.session_state["authenticated"]:
+    # Check login status
+    if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
         login_page()
         return
-
-    # Load Data (force reload if needed by session state)
-    if "refresh" in st.session_state:
-        st.cache_data.clear() # Clear cache if implemented, or just re-read
-        del st.session_state["refresh"]
-        
-    df = load_data()
+    
+    # Initialize database
+    init_db()
+    
+    # Get user_id from session
+    user_id = st.session_state.get('user_id', 1)
+    
+    # Load Data for current user
+    df = load_data(user_id)
+    
+    # Show database status in sidebar
+    if database_available():
+        st.sidebar.success("🔒 Database: Connected (Secure)")
+    else:
+        st.sidebar.warning("📁 Database: CSV Mode (Local)")
     
     # Header & Logout
     c1, c2 = st.sidebar.columns([3, 1])
