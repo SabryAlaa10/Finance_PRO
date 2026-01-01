@@ -265,8 +265,6 @@ def render_add_transaction():
                         <div class="stats-value" style="background: linear-gradient(120deg, {balance_color}, {balance_color}); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{stats['net_balance']:,.0f}</div>
                     </div>
                     """, unsafe_allow_html=True)
-                </div>
-                """, unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
     except:
