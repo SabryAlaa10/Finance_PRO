@@ -302,10 +302,24 @@ def main():
     df = load_data(user_id)
     
     # Show database status in sidebar with data source info
-    from logic.database import database_available
+    from logic.database import database_available, get_database_url
+    db_url = get_database_url()
+    
     if database_available():
         st.sidebar.success("🔒 Database: Connected (Neon)")
+        if db_url:
+            # Show last 10 chars of connection string
+            masked_url = "..." + db_url[-20:] if len(db_url) > 20 else db_url
+            st.sidebar.caption(f"🔗 {masked_url}")
+        st.sidebar.caption(f"👤 User ID: {user_id}")
         st.sidebar.caption(f"📊 Transactions: {len(df)} records")
+        
+        # Add debug button
+        if st.sidebar.button("🔄 Force Reload from DB"):
+            from logic.data_loader import load_data_cached
+            load_data_cached.clear()
+            st.session_state['data_refresh_key'] = st.session_state.get('data_refresh_key', 0) + 1
+            st.rerun()
     else:
         st.sidebar.warning("📁 Database: CSV Mode (Local)")
         st.sidebar.caption(f"⚠️ Using local CSV file")

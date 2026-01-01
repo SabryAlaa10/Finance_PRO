@@ -39,11 +39,21 @@ def init_db():
 @st.cache_data(ttl=300, show_spinner=False)  # Cache for 5 minutes instead of 10 seconds
 def load_data_cached(user_id=1, cache_key=None):
     """Load transactions with caching for better performance."""
+    print(f"🔄 Loading data for user_id={user_id}, cache_key={cache_key}")
+    
     # Try loading from database first
     if database_available():
-        df = load_transactions_from_db(user_id)
-        if df is not None:
-            return df
+        try:
+            df = load_transactions_from_db(user_id)
+            if df is not None and not df.empty:
+                print(f"✅ Loaded {len(df)} transactions from database")
+                return df
+            else:
+                print(f"⚠️ Database returned empty, trying CSV")
+        except Exception as e:
+            print(f"❌ Database load error: {e}, trying CSV")
+    else:
+        print("⚠️ Database not available, using CSV")
     
     # Fallback to CSV
     try:
@@ -51,6 +61,7 @@ def load_data_cached(user_id=1, cache_key=None):
         # Ensure Date is datetime
         if not df.empty:
             df["Date"] = pd.to_datetime(df["Date"])
+        print(f"💾 Loaded {len(df)} transactions from CSV")
         return df
     except Exception as e:
         print(f"Error loading data: {e}")
@@ -70,12 +81,22 @@ def save_transaction(date, type_, category, source, amount, description="", user
     
     # Try saving to database first
     if database_available():
-        success = save_transaction_to_db(user_id, date, type_, category, source, amount, description)
-        if success:
-            # Increment cache key to refresh data
-            current_key = st.session_state.get('data_refresh_key', 0)
-            st.session_state['data_refresh_key'] = current_key + 1
-            return True
+        try:
+            success = save_transaction_to_db(user_id, date, type_, category, source, amount, description)
+            if success:
+                print(f"✅ Transaction saved to database (user_id={user_id})")
+                # Increment cache key to refresh data
+                current_key = st.session_state.get('data_refresh_key', 0)
+                st.session_state['data_refresh_key'] = current_key + 1
+                # Clear the cache to force reload
+                load_data_cached.clear()
+                return True
+            else:
+                print(f"⚠️ Database save failed, falling back to CSV")
+        except Exception as e:
+            print(f"❌ Database error: {e}, falling back to CSV")
+    else:
+        print("⚠️ Database not available, using CSV")
     
     # Fallback to CSV
     new_data = {
@@ -91,9 +112,12 @@ def save_transaction(date, type_, category, source, amount, description="", user
     # Append to CSV
     header = not DATA_FILE.exists()
     new_df.to_csv(DATA_FILE, mode='a', header=header, index=False)
+    print(f"💾 Transaction saved to CSV")
     
     # Increment cache key to refresh data
     current_key = st.session_state.get('data_refresh_key', 0)
     st.session_state['data_refresh_key'] = current_key + 1
+    # Clear the cache to force reload
+    load_data_cached.clear()
     
     return True
