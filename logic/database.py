@@ -113,7 +113,17 @@ def load_transactions_from_db(user_id=1):
     try:
         print(f"🔍 Querying database for user_id={user_id}")
         
-        # Optimized query: select only needed columns, add index hint
+        # First, check what's in the database (debug)
+        debug_query = "SELECT COUNT(*) as total FROM transactions"
+        debug_df = pd.read_sql_query(debug_query, engine)
+        print(f"📊 Total transactions in DB (all users): {debug_df['total'].iloc[0]}")
+        
+        # Check transactions per user
+        users_query = "SELECT user_id, COUNT(*) as count FROM transactions GROUP BY user_id"
+        users_df = pd.read_sql_query(users_query, engine)
+        print(f"👥 Transactions by user_id:\n{users_df.to_string()}")
+        
+        # Now query for specific user
         query = """
             SELECT date, type, category, source, amount, description
             FROM transactions
@@ -123,7 +133,7 @@ def load_transactions_from_db(user_id=1):
         # Use read_sql_query instead of read_sql for better performance
         df = pd.read_sql_query(query, engine, params={"user_id": user_id})
         
-        print(f"📊 Database returned {len(df)} rows")
+        print(f"📊 Database returned {len(df)} rows for user_id={user_id}")
         
         if not df.empty:
             print(f"📋 Columns from DB: {df.columns.tolist()}")
@@ -144,7 +154,8 @@ def load_transactions_from_db(user_id=1):
             print(f"✅ Successfully loaded and formatted {len(df)} transactions")
             return df
         else:
-            print("⚠️ Query returned empty DataFrame")
+            print(f"⚠️ Query returned empty DataFrame for user_id={user_id}")
+            print(f"💡 Tip: Check if transactions have correct user_id in database")
             return df
             
     except Exception as e:
