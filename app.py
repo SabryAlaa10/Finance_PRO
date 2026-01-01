@@ -322,8 +322,7 @@ def main():
     
     # Add debug button
     if st.sidebar.button("🔄 Force Reload Data", use_container_width=True):
-        from logic.data_loader import load_data_cached
-        load_data_cached.clear()
+        # Cache is disabled for debugging, just increment refresh key
         st.session_state['data_refresh_key'] = st.session_state.get('data_refresh_key', 0) + 1
         st.rerun()
     
