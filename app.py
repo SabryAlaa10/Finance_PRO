@@ -3,8 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 # Import Logic
-from logic.data_loader import load_data, init_db
-from logic.database import verify_user, database_available, init_database
+from logic.data_loader import load_data, check_database
 from ui.styles import APP_STYLE
 
 # Import UI Modules
@@ -25,12 +24,6 @@ st.set_page_config(
 
 # Apply Styles
 st.markdown(APP_STYLE, unsafe_allow_html=True)
-
-# Initialize database on app start
-if database_available() and 'db_initialized' not in st.session_state:
-    with st.spinner("Initializing database..."):
-        init_database()
-    st.session_state['db_initialized'] = True
 
 # Main App Logic
 def login_page():
@@ -241,33 +234,12 @@ def login_page():
         st.markdown('</div>', unsafe_allow_html=True)
         
         st.markdown('<div class="login-button">', unsafe_allow_html=True)
-        # Login logic
+        # Simple login - just hardcoded credentials
         if st.button("🚀 Login", type="primary", use_container_width=True):
-            login_success = False
-            
-            # Try database authentication first
-            if database_available():
-                try:
-                    user_id = verify_user(username, password)
-                    if user_id:
-                        st.session_state['logged_in'] = True
-                        st.session_state['username'] = username
-                        st.session_state['user_id'] = user_id
-                        login_success = True
-                except Exception as e:
-                    print(f"Database login error: {e}")
-                    # Fall through to hardcoded credentials
-            
-            # Fallback to hardcoded credentials if database fails or not available
-            if not login_success:
-                if username == "saleh" and password == "saleh109":
-                    st.session_state['logged_in'] = True
-                    st.session_state['username'] = username
-                    st.session_state['user_id'] = 1
-                    login_success = True
-            
-            # Show result
-            if login_success:
+            if username == "saleh" and password == "saleh109":
+                st.session_state['logged_in'] = True
+                st.session_state['username'] = username
+                st.session_state['user_id'] = 1
                 st.balloons()
                 st.rerun()
             else:
@@ -292,38 +264,26 @@ def main():
         login_page()
         return
     
-    # Initialize database and CSV
-    init_db()
-    
     # Get user_id from session
     user_id = st.session_state.get('user_id', 1)
     
     # Load Data for current user
     df = load_data(user_id)
     
-    # Show database status in sidebar with data source info
-    from logic.database import database_available, get_database_url
-    db_url = get_database_url()
-    
-    if not database_available():
+    # Show database status in sidebar
+    if not check_database():
         st.sidebar.error("❌ Database: NOT CONNECTED")
         st.sidebar.warning("⚠️ Configure Neon database in Secrets")
         st.sidebar.stop()
     
-    st.sidebar.success("✅ Database: Neon (Connected)")
-    if db_url:
-        # Show last 20 chars of connection string
-        masked_url = "..." + db_url[-25:] if len(db_url) > 25 else db_url
-        st.sidebar.caption(f"🔗 {masked_url}")
+    st.sidebar.success("✅ Database: Connected")
     st.sidebar.caption(f"👤 User ID: {user_id}")
     st.sidebar.caption(f"📊 Transactions: **{len(df)}** records")
     
     st.sidebar.divider()
     
-    # Add debug button
-    if st.sidebar.button("🔄 Force Reload Data", use_container_width=True):
-        # Cache is disabled for debugging, just increment refresh key
-        st.session_state['data_refresh_key'] = st.session_state.get('data_refresh_key', 0) + 1
+    # Add reload button
+    if st.sidebar.button("🔄 Reload Data", use_container_width=True):
         st.rerun()
     
     # Header & Logout

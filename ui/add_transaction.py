@@ -1,7 +1,7 @@
 import streamlit as st
 import datetime
 import pandas as pd
-from logic.data_loader import save_transaction, load_data
+from logic.data_loader import save_data, load_data
 
 def get_user_id():
     """Get current user_id from session"""
@@ -390,14 +390,14 @@ def render_add_transaction():
             if amount > 0:
                 # Show loading spinner during save
                 with st.spinner("Saving transaction..."):
-                    success = save_transaction(
+                    success = save_data(
+                        get_user_id(),
                         date, 
                         txn_type_clean, 
                         category_clean, 
                         source_clean, 
                         amount, 
-                        description,
-                        user_id=get_user_id()
+                        description
                     )
                 
                 if success:
